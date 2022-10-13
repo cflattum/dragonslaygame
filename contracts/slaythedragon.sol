@@ -5,7 +5,9 @@ import "../node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "../node_modules/@openzeppelin/contracts/access/Ownable.sol"; 
 import "../node_modules/@openzeppelin/contracts/security/Pausable.sol"; 
 
-//things need to check for
+//things need to check for 
+//1. Function Visibility
+
 /**
 * @title SlayTheDragon: a erc 1155 minting contract for rewarding minigames in the Knights who say Nah
 * @author Christopher Carl Flattum
@@ -71,14 +73,24 @@ contract slaythedragon is ERC1155, Ownable, Pausable
      //returns true if have not played in two days
      function checkLastPlay(address play) public view returns (bool allowed)
      {
-        //if time last played + 2 days is before now, 
-        if((_players[play].timeLastPlayed + 86400) < block.timestamp)
+        //if time last played + 2 days is before now,
+        //2*24*60*60= 2 days in seconds / 172800 seconds
+        if((_players[play].timeLastPlayed + 172800) < block.timestamp)
         {
             return true;
         }
         else
         {
             return false;
+        }
+     }
+
+       //this function checks if the wallet is ok to try playing - 
+     function checkBeforePlaying(address play) public view returns (bool oktoPlay)
+     {
+        if(checkLastPlay(play) == true && beenRewarded(play) == false)
+        {
+            return true;
         }
      }
 
