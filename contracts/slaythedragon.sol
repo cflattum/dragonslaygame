@@ -29,7 +29,7 @@ contract slaythedragon is ERC1155, Ownable, Pausable
 
    address private _signerAddress;
 
-   uint32 private _nftID = 1;
+   uint8 private _nftID = 1;
 
    mapping (address => player) private _players;
 
@@ -67,7 +67,7 @@ contract slaythedragon is ERC1155, Ownable, Pausable
          _signerAddress = signerAddress;
      }
 
-     function changeReward(uint id) public onlyOwner
+     function changeReward(uint8 id) public onlyOwner
      {
          _nftID = id;
      }
@@ -78,7 +78,8 @@ contract slaythedragon is ERC1155, Ownable, Pausable
         mainContract = newAddy;
      }
 
-    //returns true if has been awarded already, false if not 
+    //getter function that allows us to check whether a player has been rewarded with a certain 
+    //reward already. Not sure fully needed but adding for future functionality
      function beenRewarded(address play, uint id) public view returns (bool allowed)
      {
         if(_players[play].awarded[id] == false)
@@ -93,7 +94,7 @@ contract slaythedragon is ERC1155, Ownable, Pausable
 
      //This transaction is signed by a player as a prerequisite to playing;
      //notates the time they tried to play to prevent them from playing again too soon in the future
-     function attemptPlay(address play) public view returns (bool allowed)
+     function attemptPlay(address play) public
      {
         _players[play].timeLastPlayed = block.timestamp;
      }
@@ -108,36 +109,9 @@ contract slaythedragon is ERC1155, Ownable, Pausable
         }
      }
 
-   //  //internal (?) function that puts on a 'whitelist' to allow minting
-   //   function addWhitelist(address play) public onlyOwner 
-   //   {
-   //      //set whitelist variable to true for a certain address play
-   //      //called by the website when the player wins the game
-   //      _players[play].approved = true;
-   //   }
-     
-     //function that is called during/after playing - signaling the win/loss, and adding timestamps
-     function receivePlay(address play, bool result) external onlyOwner
+     function playedLast(address play) public view returns(uint lastPlayed)
      {
-        //when player plays, the website calls this function to add results
-        _players[play].timeLastPlayed = block.timestamp;
-
-        //if we won, add to whitelist
-        if(result == true)
-        {
-            //addWhitelist(play);
-
-            //design question: Should immeaditely mint from here?
-            //its possible! and maybe the easiest way - need to figure out how to give permissions 
-            
-            //maybe not; need to record that they played, and the result.
-            //well - if they lose, this if isnt run, so...
-
-            //NOT FINAL
-            mintReward(play);
-        }
+      return _players[play].timeLastPlayed;
      }
-
-
 }
 
