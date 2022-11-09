@@ -162,7 +162,8 @@ contract slaythedragon is ERC1155, Ownable, Pausable
 
         _safeBatchTransferFrom(from, to, id, amount, data);
     }
-
+    
+   //test
    //should this be Public? Will players burn their tokens themselves and mint something new, or?
    //function burnRewards(address player, uint8[] memory ids) external onlyOwner
    {
