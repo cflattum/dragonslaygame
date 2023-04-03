@@ -1,39 +1,30 @@
 //SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "../node_modules/@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
+import "../node_modules/@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Burnable.sol";
 import "../node_modules/@openzeppelin/contracts/access/Ownable.sol"; 
 import "../node_modules/@openzeppelin/contracts/security/Pausable.sol";
 import "../node_modules/@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "../node_modules/@openzeppelin/contracts/utils/Strings.sol";
 
-//things need to check for 
-//1. Function Visibility
-
-//REQUIREMENTS TO BE IMPLEMENTED STILL:
-// NON-TRANSFERABLE BADGE
-// 1 DAY COOLDOWN - DONE
-// Must inherit a custom contract. (and use to remove Transfer function lmao)
-//actually no they are internal functions ^ but yes remove transfer function lol 
-//Implement burn function (betting this will be wanted in future interation)
 
 /**
-* @title SlayTheDragon: a erc 1155 minting contract for rewarding minigames in the Knights who say Nah
+* @title SlayTheDragon: an erc 1155 minting contract for rewarding minigames in the Knights who say Nah
 * @author Christopher Carl Flattum for Knights Who Say Nah LLC
 * @notice Mapping of player structs holds crucial information
-* @notice deployer must set main contract address with functions in file
+* @notice deployer must set signer with functions in file
 * @notice can change URI via default 1155 function for reuse
 */
-contract slaythedragon is ERC1155, Ownable, Pausable
+contract slaythedragon is ERC1155Burnable,Ownable,Pausable
 {
-   //using Strings for string;
+   using Strings for string;
    using ECDSA for bytes32;
 
    address private thisContract;
    address private mainContract;
+   bool private transfersAllowed = false;
 
    address private _signerAddress;
-
-   //uint8 private _nftID = 1;
 
    mapping (address => player) private _players;
 
@@ -41,10 +32,10 @@ contract slaythedragon is ERC1155, Ownable, Pausable
    struct player{
         //address player;
         mapping(uint => bool) awarded;
-        mapping(uint => uint256) timeLastPlayed;
+        // mapping(uint => uint256) timeLastPlayed;
     }
 
-     constructor() ERC1155("URI PATH TO BE EDITED"){
+     constructor() ERC1155("QmdHztQaKM4EoKiEQWVu9LzJiznTSnqYnGY7knc4aLVoFU"){
         thisContract = address(this);
      }
       /**
@@ -54,9 +45,8 @@ contract slaythedragon is ERC1155, Ownable, Pausable
       * @param sig is a ECDSA signature that is sent from our front end, being signed by a known wallet.
       * @notice This checks a signature against a _signerAddress, which is set by a setter function
       * @notice This checks they havent minted reward, that the sig is valid, tracks that the award is set, and mints
-      * @notice THIS IS NOT MINTING SOULBOUND TOKENS. THIS IS MINTING NORMALLY. MUST CHANGE INHERITANCE TO A NON ERC1155 CONTRACT
       */
-   function mintReward(address toMint, uint8 rewardID, bytes calldata sig) public
+   function mintReward(address toMint, uint8 rewardID, bytes calldata sig) public whenNotPaused
    {
       //requires that 1. Have not minted before
       require(_players[toMint].awarded[rewardID] == false, "Already minted reward");
@@ -70,7 +60,38 @@ contract slaythedragon is ERC1155, Ownable, Pausable
       _players[toMint].awarded[rewardID] = true;
 
       //mints to address, using ID, one NFT, no extra data
+      //not using safemint bc this is an end user function and we are not worried about a contract 
+      //not accepting our transfer (:
       _mint(toMint, rewardID, 1, "");
+   }
+
+   function ownerMint(address toMint, uint8 rewardID) public onlyOwner
+   {
+    //ensure we do not give a player two of the same badge
+    require(_players[toMint].awarded[rewardID] == false, "Already minted reward");
+
+    //change player variables to signify awarded state
+      _players[toMint].awarded[rewardID] = true;
+
+    //mint to player
+      _mint(toMint,rewardID,1,"");
+   }
+
+
+   function batchOwnerMint(address[] memory _toMint, uint8 rewardID) public onlyOwner
+   {
+    //for each address in the calldata, 
+    for(uint i = 0; i < _toMint.length; i++)
+    {
+        //check that each player has not received badge already
+        require(_players[_toMint[i]].awarded[rewardID] == false, "Already minted reward");
+
+        //change player variables to signify awarded state
+        _players[_toMint[i]].awarded[rewardID] = true;
+
+        //mint to each player
+        _mint(_toMint[i],rewardID,1,"");
+    }
    }
 
      
@@ -81,11 +102,6 @@ contract slaythedragon is ERC1155, Ownable, Pausable
    {
       _signerAddress = signerAddress;
    }
-
-   // function changeReward(uint8 id) public onlyOwner
-   // {
-   //    _nftID = id;
-   // }
 
     //not actually needed with current design; iteration upon design may require
    function changeMainContractAddy(address newAddy) external onlyOwner
@@ -107,26 +123,16 @@ contract slaythedragon is ERC1155, Ownable, Pausable
      }
    }
 
-     //This transaction is signed by a player as a prerequisite to playing;
-     //notates the time they tried to play to prevent them from playing again too soon in the future
-     //remix estimated this at 7.5 cents
-   function attemptPlay(address play, uint8 rewardID) public
+   function allowTransfers(bool allow) external onlyOwner
    {
-      _players[play].timeLastPlayed[rewardID] = block.timestamp;
+      transfersAllowed = allow;
    }
-
-   //This function is a Getter Function to access the last play time of a specific player on a specific game 
-   function playedLast(address play, uint8 rewardID) public view returns(uint lastPlayed)
-   {
-    return _players[play].timeLastPlayed[rewardID];
-   }
-
-
+   
    //this function checks if the wallet is ok to try playing - this is checked before they are allowed to try
    //called before the above function attemptPlay which notates into memory they are trying to play
    function checkBeforePlaying(address play, uint8 rewardID) public view returns (bool oktoPlay)
    {
-     if(_players[play].awarded[rewardID] == false && ((_players[play].timeLastPlayed[rewardID] + 86400) < block.timestamp))
+     if(_players[play].awarded[rewardID] == false)
      {
          return true;
      }
@@ -137,15 +143,16 @@ contract slaythedragon is ERC1155, Ownable, Pausable
    }
 
    //overriding the transfer function
-   //write Nat-spec format for this and below TODO
+   //write Nat-spec format for this and below
    function safeTransferFrom(
         address from,
         address to,
         uint256 id,
         uint256 amount,
         bytes memory data
-    ) public virtual override onlyOwner {
-        require(msg.sender == _signerAddress, "Badges won in fights are non-transferable.");
+    ) public virtual override {
+
+        require(transfersAllowed == true, "Badges won in fights are non-transferable.");
 
         _safeTransferFrom(from, to, id, amount, data);
     }
@@ -154,21 +161,34 @@ contract slaythedragon is ERC1155, Ownable, Pausable
     function safeBatchTransferFrom(
         address from,
         address to,
-        uint256 id,
-        uint256 amount,
+        uint256[] memory id,
+        uint256[] memory amount,
         bytes memory data
-    ) public virtual override onlyOwner {
-        require(msg.sender == _signerAddress, "Badges won in fights are non-transferable.");
+    ) public virtual override {
+        require(transfersAllowed == true, "Badges won in fights are non-transferable.");
 
         _safeBatchTransferFrom(from, to, id, amount, data);
     }
-    
-   //test
-   //should this be Public? Will players burn their tokens themselves and mint something new, or?
-   //function burnRewards(address player, uint8[] memory ids) external onlyOwner
-   {
-      //not finished
-     // _burnBatch
-   }
-}
 
+    function changeURI(string memory newuri) external onlyOwner {
+        _setURI(newuri);
+    }
+
+    function uri(uint256 _id) public view override returns (string memory) {
+    return Strings.strConcat(
+      uri,
+      Strings.uint2str(_id),
+      ".json"
+    );
+  }
+
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+}
