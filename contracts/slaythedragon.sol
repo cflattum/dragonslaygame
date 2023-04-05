@@ -22,6 +22,7 @@ contract slaythedragon is ERC1155Burnable,Ownable,Pausable
 
    address private thisContract;
    address private mainContract;
+   string private baseuri;
    bool private transfersAllowed = false;
 
    address private _signerAddress;
@@ -35,7 +36,7 @@ contract slaythedragon is ERC1155Burnable,Ownable,Pausable
         // mapping(uint => uint256) timeLastPlayed;
     }
 
-     constructor() ERC1155("QmdHztQaKM4EoKiEQWVu9LzJiznTSnqYnGY7knc4aLVoFU"){
+     constructor() ERC1155("QmPFKNJ7d6FdWNiM5Qz2YxWtUiAj5kzBQt5hvJTwJDA9KM/"){
         thisContract = address(this);
      }
       /**
@@ -68,7 +69,7 @@ contract slaythedragon is ERC1155Burnable,Ownable,Pausable
    function ownerMint(address toMint, uint8 rewardID) public onlyOwner
    {
     //ensure we do not give a player two of the same badge
-    require(_players[toMint].awarded[rewardID] == false, "Already minted reward");
+    //require(_players[toMint].awarded[rewardID] == false, "Already minted reward");
 
     //change player variables to signify awarded state
       _players[toMint].awarded[rewardID] = true;
@@ -84,7 +85,7 @@ contract slaythedragon is ERC1155Burnable,Ownable,Pausable
     for(uint i = 0; i < _toMint.length; i++)
     {
         //check that each player has not received badge already
-        require(_players[_toMint[i]].awarded[rewardID] == false, "Already minted reward");
+        //require(_players[_toMint[i]].awarded[rewardID] == false, "Already minted reward");
 
         //change player variables to signify awarded state
         _players[_toMint[i]].awarded[rewardID] = true;
@@ -174,12 +175,12 @@ contract slaythedragon is ERC1155Burnable,Ownable,Pausable
         _setURI(newuri);
     }
 
+    function changeBaseURI(string memory newuri) external onlyOwner {
+        baseuri = newuri;
+    }
+
     function uri(uint256 _id) public view override returns (string memory) {
-    return Strings.strConcat(
-      uri,
-      Strings.uint2str(_id),
-      ".json"
-    );
+    return string(abi.encodePacked(baseuri, Strings.toString(_id), ".json"));
   }
 
 
